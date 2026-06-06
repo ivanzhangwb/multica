@@ -1,0 +1,459 @@
+---
+title: Agent 与 Runtime 执行链路
+description: packages/core/agents、后端任务分发、daemon 与本地 AI 工具之间的真实联动方式。
+---
+
+## 先说结论
+
+`packages/core/agents` 不是执行层。
+
+它负责的是前端里的智能体数据模型、查询、缓存和页面交互：例如读取 agent 列表、展示 `instructions`、编辑 `custom_env`、绑定 `skills`、展示 runtime 在线状态。真正把任务跑在用户电脑上的，是下面这条链路：
+
+1. 前端把 agent 配置写入后端
+2. 后端把任务排进 `agent_task_queue`
+3. 用户电脑上的 daemon 为某个 runtime claim 任务
+4. 后端把 agent 的完整执行材料返回给 daemon
+5. daemon 在本地创建隔离工作目录，写入 `AGENTS.md` / `CLAUDE.md` / `SKILL.md`
+6. daemon 启动本机安装的 `claude`、`codex`、`opencode`、`openclaw` 等 CLI
+
+因此，“agent 在哪里运行”这个问题的答案是：**运行在用户自己的电脑上，使用用户自己安装和配置的 AI 工具；Multica 服务器负责调度，不直接执行。**
+
+## `packages/core/agents` 的职责边界
+
+`packages/core/agents` 和 `packages/core/types/agent.ts` 主要定义前端看到的 agent 形状，包括：
+
+- `runtime_id`
+- `instructions`
+- `custom_env`
+- `custom_args`
+- `model`
+- `thinking_level`
+- `skills`
+
+这些字段在前端里只是“可编辑配置”和“展示数据”，不是执行实现。
+
+相关代码：
+
+- `packages/core/types/agent.ts`
+- `packages/core/agents/queries.ts`
+- `packages/views/agents/components/*`
+
+可以把它理解为：
+
+- `packages/core/agents` 负责“这个 agent 在产品里长什么样、如何被编辑、如何从 API 读取”
+- `server/internal/daemon/*` 和 `server/pkg/agent/*` 负责“这个 agent 在本地机器上如何真正跑起来”
+
+## 核心组件分工
+
+### 1. 前端：agent 配置的编辑与展示
+
+前端通过 API 读写 agent 配置。一个 agent 会绑定到一个 `runtime_id`，并持久化自己的：
+
+- `instructions`
+- `skills`
+- `custom_env`
+- `custom_args`
+- `mcp_config`
+- `model`
+- `thinking_level`
+
+这里的 `runtime_id` 指向的是某个具体 runtime 行，而 runtime 的本质是：
+
+**某个 workspace 下的一台 daemon 机器 + 某一款本地 AI 工具。**
+
+### 2. 服务端：任务排队与 claim
+
+任务不会直接发给前端，而是先进入 `agent_task_queue`。当某个 runtime 来 claim 任务时，服务端会在 `ClaimTaskByRuntime` 里把执行所需的数据一次性拼出来返回给 daemon。
+
+关键代码：
+
+- `server/internal/handler/daemon.go`
+
+返回内容里不仅有 task 本身，还有：
+
+- `resp.Agent.Instructions`
+- `resp.Agent.Skills`
+- `resp.Agent.CustomEnv`
+- `resp.Agent.CustomArgs`
+- `resp.Agent.McpConfig`
+- `resp.Agent.Model`
+- `resp.Agent.ThinkingLevel`
+- `WorkspaceID`
+- `Repos`
+- `ProjectResources`
+- `PriorSessionID`
+- `PriorWorkDir`
+
+这一步非常关键：**daemon 不需要自己去拼 agent 配置，服务端 claim 响应已经把执行材料准备好了。**
+
+### 3. Daemon：把“数据库配置”变成本地可执行环境
+
+daemon 收到 claim 响应后，会在本地运行 `runTask`。
+
+关键代码：
+
+- `server/internal/daemon/daemon.go`
+
+这一层会做几件事：
+
+1. 根据 task 和 agent 数据组装 `TaskContextForEnv`
+2. 创建或复用本地工作目录
+3. 把上下文写入文件系统
+4. 注入 runtime 需要的环境变量
+5. 选择对应 provider backend
+6. 启动本地 CLI
+
+也就是说，daemon 是真正把“平台里的 agent 配置”翻译成“用户电脑上的一次本地任务执行”的桥。
+
+### 4. Provider backend：真正调用本机 AI CLI
+
+统一接口在：
+
+- `server/pkg/agent/agent.go`
+
+具体 provider 在：
+
+- `server/pkg/agent/claude.go`
+- `server/pkg/agent/codex.go`
+- `server/pkg/agent/opencode.go`
+- `server/pkg/agent/openclaw.go`
+- `server/pkg/agent/cursor.go`
+- `server/pkg/agent/pi.go`
+- `server/pkg/agent/kimi.go`
+- `server/pkg/agent/kiro.go`
+
+这些 backend 最终都会 `exec` 用户机器上的本地程序，例如：
+
+- Claude: 执行本机 `claude`
+- Codex: 执行本机 `codex app-server --listen stdio://`
+
+所以 runtime 不是云容器，也不是 server 进程。它就是“daemon 拉起本机 CLI”。
+
+## 一条完整时序
+
+下面这条链路对应当前仓库里的真实运行方式。
+
+### 1. 创建或编辑 agent
+
+用户在前端配置：
+
+- 选择运行时 `runtime_id`
+- 填写 `instructions`
+- 绑定 `skills`
+- 配置 `custom_env`
+- 配置 `custom_args`
+- 配置 `mcp_config`
+- 选择 `model` / `thinking_level`
+
+后端将这些字段存入 `agent`、`agent_skill`、`skill`、`skill_file` 等表。
+
+### 2. 任务入队
+
+当 issue 被分配、评论触发、chat 消息触发，或者 autopilot 运行时，服务端创建一条 `agent_task_queue` 记录，记录它应当由哪个 `runtime_id` 来执行。
+
+### 3. daemon claim 任务
+
+用户电脑上的 daemon 会不断轮询或被唤醒，然后调用 `ClaimTaskByRuntime`。
+
+这一步服务端会：
+
+- 校验 daemon token 对该 runtime 是否有权限
+- 从数据库取 task
+- 再取最新 agent 数据
+- 再取 agent 绑定的完整 skills
+- 再补齐 workspace / repo / project / comment / prior session 等上下文
+
+最后返回一个带完整 `TaskAgentData` 的 task payload。
+
+### 4. daemon 创建本地执行环境
+
+daemon 进入 `runTask` 后，会创建或复用一个本地目录：
+
+- 根目录按 `workspace_id/task_id` 分组
+- 内含 `workdir/`、`output/`、`logs/`
+
+相关代码：
+
+- `server/internal/daemon/execenv/execenv.go`
+
+daemon 会把 claim 回来的信息写成文件：
+
+- `.agent_context/issue_context.md`
+- `.multica/project/resources.json`
+- provider 对应的 `AGENTS.md` / `CLAUDE.md` / `GEMINI.md`
+- provider 对应的 skills 目录
+
+### 5. daemon 注入 instructions
+
+agent 的 `instructions` 不只是放在内存里。
+
+它们主要会通过 `InjectRuntimeConfig` 写进 runtime 配置文件中：
+
+- Claude 写 `CLAUDE.md`
+- Codex / OpenCode / OpenClaw / Copilot / Cursor / Pi / Kimi / Kiro 等写 `AGENTS.md`
+- Gemini 写 `GEMINI.md`
+
+相关代码：
+
+- `server/internal/daemon/execenv/runtime_config.go`
+
+这些文件里不仅有 agent instructions，还会包含：
+
+- agent identity
+- Multica CLI 的核心工作流
+- Requesting User 信息
+- repo / project resource 提示
+- comment reply 约束
+- provider 特定说明
+
+因此对很多 runtime 来说，**真正长期生效的“系统说明”不在单次 prompt 里，而是在 daemon 写入的本地配置文件里。**
+
+### 6. daemon 注入 skills
+
+skills 也不是抽象概念，而是会被 daemon 写成真实的 `SKILL.md` 和附属文件。
+
+相关代码：
+
+- `server/internal/daemon/execenv/context.go`
+
+不同 provider 的注入目录不同：
+
+- Claude: `.claude/skills/<name>/SKILL.md`
+- Copilot: `.github/skills/<name>/SKILL.md`
+- OpenCode: `.opencode/skills/<name>/SKILL.md`
+- OpenClaw: `skills/<name>/SKILL.md`
+- Pi: `.pi/skills/<name>/SKILL.md`
+- Cursor: `.cursor/skills/<name>/SKILL.md`
+- Kimi: `.kimi/skills/<name>/SKILL.md`
+- Kiro: `.kiro/skills/<name>/SKILL.md`
+
+这些路径不是 Multica 自己随便定的，而是尽量贴各家 CLI 的原生技能发现机制。
+
+### 7. daemon 组装执行参数并启动本机 CLI
+
+在真正执行前，daemon 还会组装环境变量和执行选项，例如：
+
+- `MULTICA_TOKEN`
+- `MULTICA_SERVER_URL`
+- `MULTICA_WORKSPACE_ID`
+- `MULTICA_AGENT_ID`
+- `MULTICA_TASK_ID`
+- `CODEX_HOME`
+- `OPENCLAW_CONFIG_PATH`
+
+同时也会把 agent 上配置的：
+
+- `custom_env`
+- `custom_args`
+- `mcp_config`
+- `model`
+- `thinking_level`
+
+一起传给 backend。
+
+然后 backend 启动本机 CLI。
+
+## prompt、配置文件、skills 三者如何分工
+
+这三者在当前实现里是分层的：
+
+### 1. 单次 prompt
+
+由 `server/internal/daemon/prompt.go` 构造。
+
+它只负责这次 task 的即时目标，例如：
+
+- 这是一个 issue task 还是 comment task
+- 新评论内容是什么
+- 先运行哪条 `multica issue get` / `multica issue comment list` 命令
+
+特点是“薄”和“任务态”。
+
+### 2. runtime 配置文件
+
+由 `InjectRuntimeConfig` 写入 `AGENTS.md` / `CLAUDE.md` / `GEMINI.md`。
+
+它负责：
+
+- agent persona
+- 通用工作流
+- CLI 使用规则
+- 回复评论的格式规则
+- provider 特定约束
+
+特点是“重”和“行为规范”。
+
+### 3. skills
+
+由 daemon 写入 provider 原生 skills 目录。
+
+它负责可复用能力块，例如：
+
+- 某个评审方法
+- 某个部署流程
+- 某个仓库特定操作流程
+
+特点是“模块化能力包”。
+
+可以把这三者理解成：
+
+- prompt：这次要做什么
+- runtime config：做事时总规则是什么
+- skills：你有哪些可调用的专长
+
+## 工作区 skills 与本机 user skills 怎么共存
+
+当前项目里实际上有两类 skill。
+
+### 1. Multica 工作区 skills
+
+这类 skill 存在数据库里，由 workspace 管理：
+
+- `skill`
+- `skill_file`
+- `agent_skill`
+
+服务端 claim task 时会把它们作为 `resp.Agent.Skills` 返回给 daemon，然后 daemon 写入本次任务环境。
+
+### 2. 用户本机自己安装的 skills
+
+这类 skill 不在 Multica 数据库里，而在用户本地目录，例如：
+
+- `~/.claude/skills`
+- `~/.codex/skills`
+- `~/.cursor/skills`
+- `~/.kiro/skills`
+
+相关代码：
+
+- `server/internal/daemon/local_skills.go`
+
+这套代码还支持把本机发现到的 local skills 列出来，并导入成 workspace skills。
+
+### 两者如何合并
+
+多数 provider 下，两者天然并存：
+
+- daemon 负责往 task workdir 写 workspace/project 级 skills
+- provider 自己仍然能看到用户 home 下已有的 user skills
+
+Codex 是特例。
+
+因为 daemon 会把 `CODEX_HOME` 指向每任务独立目录，Codex 默认看不到用户真实的 `~/.codex/skills`。所以当前实现会先把用户本地 codex skills 复制进 per-task `CODEX_HOME`，然后再写入 workspace skills。
+
+相关代码：
+
+- `server/internal/daemon/execenv/codex_user_skills.go`
+
+优先级规则是：
+
+- 同名时，workspace skill 覆盖 user skill
+- 非同名时，两者同时可见
+
+这保证了：
+
+- 用户已有的个人技能不会凭空消失
+- 工作区明确绑定的技能仍然具有更高优先级
+
+## MCP、custom args、custom env 如何下发
+
+除了 `instructions` 和 `skills`，agent 的其他运行参数也是随 claim 响应一起下发的。
+
+### `custom_env`
+
+daemon 会把 agent 配置里的 `custom_env` 合并到进程环境变量里，但会阻止覆盖关键内部变量。
+
+典型用途：
+
+- API key
+- router/base URL
+- Bedrock / Azure / OpenRouter 类接入参数
+
+### `custom_args`
+
+daemon 会把 agent 的 `custom_args` 追加到 provider CLI 调用参数里，但会过滤掉协议关键参数，避免破坏 daemon 与 CLI 的控制通道。
+
+例如 Codex 不允许用户覆盖 `--listen`。
+
+### `mcp_config`
+
+对于支持 MCP 配置透传的 provider，例如 Claude，daemon 会把 `mcp_config` 写入临时文件，再通过 `--mcp-config` 传给本机 CLI。
+
+这意味着 agent 级 MCP 权限不是前端假象，而是会真实作用到这次本地执行。
+
+## 为什么说 runtime 用的是“客户电脑自己的 AI 工具”
+
+因为从实现上看，daemon 调用的是本机已有可执行文件：
+
+- `claude`
+- `codex`
+- `opencode`
+- `openclaw`
+- `cursor`
+- `pi`
+- `kimi`
+- `kiro`
+
+不是 Multica 服务器上的托管模型进程。
+
+这带来几个直接结果：
+
+- API key 往往由用户本地 CLI 或本地环境变量决定
+- 模型可用性受本地安装版本和本地登录状态影响
+- skill 发现也会受本机目录结构影响
+- 本地 CLI 升级后，runtime 行为可能随上游工具一起变化
+
+所以定位“某个 agent 为什么表现不对”时，不能只看前端页面，也必须看：
+
+- daemon logs
+- 本地 provider 版本
+- 本地 provider 登录状态
+- 本地用户级 skills
+- task workdir 内生成的 `AGENTS.md` / `CLAUDE.md` / skills 目录
+
+## 排障时优先看哪里
+
+如果你要追一条真实执行链，推荐从这几个入口开始：
+
+### 1. 看前端字段定义
+
+- `packages/core/types/agent.ts`
+
+先确认这个字段在产品层到底是什么语义。
+
+### 2. 看 claim 响应拼装
+
+- `server/internal/handler/daemon.go`
+
+确认后端究竟把哪些东西发给 daemon。
+
+### 3. 看 daemon 执行入口
+
+- `server/internal/daemon/daemon.go`
+
+确认这些字段如何变成 env、prompt、文件、CLI 参数。
+
+### 4. 看 execenv
+
+- `server/internal/daemon/execenv/execenv.go`
+- `server/internal/daemon/execenv/context.go`
+- `server/internal/daemon/execenv/runtime_config.go`
+
+确认本地目录里究竟写了什么。
+
+### 5. 看 provider backend
+
+- `server/pkg/agent/*.go`
+
+确认最后到底执行了哪个本机命令。
+
+## 一句话总结
+
+当前项目里：
+
+- `packages/core/agents` 管的是前端配置与展示
+- `server/internal/handler/daemon.go` 管的是把 agent 配置打包成可执行 task payload
+- `server/internal/daemon/*` 管的是把 payload 变成本地文件、环境变量和工作目录
+- `server/pkg/agent/*` 管的是调用用户电脑上真实安装的 AI CLI
+
+因此 `skills`、`instructions`、`mcp_config`、`custom_env`、`custom_args` 都不是停留在数据库里的静态字段，而是会在 claim 后被 daemon 翻译成**本地 runtime 可直接消费的执行环境**。

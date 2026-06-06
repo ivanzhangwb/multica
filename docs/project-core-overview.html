@@ -1,0 +1,894 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Multica 核心信息总览</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='20' fill='%23b54d2e'/%3E%3Cpath d='M17 44V20h8.2l7.3 13.2L40 20H47v24h-6V30.7l-6.1 10.8h-4.5l-6.3-11V44z' fill='white'/%3E%3C/svg%3E"
+    />
+    <meta
+      name="description"
+      content="基于 Multica 仓库 README、产品全景文档与 monorepo 结构整理的可视化核心信息总览。"
+    />
+    <style>
+      :root {
+        --bg: #f3efe7;
+        --panel: rgba(255, 252, 247, 0.88);
+        --panel-strong: #fffdf9;
+        --text: #1c1a17;
+        --muted: #655d52;
+        --line: rgba(57, 45, 28, 0.12);
+        --line-strong: rgba(57, 45, 28, 0.22);
+        --accent: #b54d2e;
+        --accent-deep: #7d2f18;
+        --accent-soft: rgba(181, 77, 46, 0.12);
+        --olive: #58653a;
+        --gold: #c5912e;
+        --shadow: 0 24px 70px rgba(58, 36, 15, 0.12);
+        --radius-xl: 32px;
+        --radius-lg: 22px;
+        --radius-md: 16px;
+        font-family:
+          "Segoe UI",
+          "PingFang SC",
+          "Hiragino Sans GB",
+          "Noto Sans SC",
+          ui-sans-serif,
+          system-ui,
+          sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(197, 145, 46, 0.18), transparent 28%),
+          radial-gradient(circle at top right, rgba(181, 77, 46, 0.16), transparent 32%),
+          linear-gradient(180deg, #f8f4ed 0%, #f1ece2 100%);
+      }
+
+      a {
+        color: inherit;
+      }
+
+      img {
+        display: block;
+        max-width: 100%;
+      }
+
+      .page {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 24px 0 80px;
+      }
+
+      .hero {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 40px;
+        background: linear-gradient(135deg, rgba(255, 252, 247, 0.95), rgba(246, 238, 226, 0.9));
+        box-shadow: var(--shadow);
+      }
+
+      .hero::before,
+      .hero::after {
+        content: "";
+        position: absolute;
+        border-radius: 999px;
+        filter: blur(4px);
+      }
+
+      .hero::before {
+        top: -80px;
+        right: -40px;
+        width: 240px;
+        height: 240px;
+        background: rgba(181, 77, 46, 0.11);
+      }
+
+      .hero::after {
+        left: -60px;
+        bottom: -90px;
+        width: 260px;
+        height: 260px;
+        background: rgba(88, 101, 58, 0.12);
+      }
+
+      .hero-banner {
+        width: 100%;
+        height: clamp(180px, 28vw, 300px);
+        object-fit: cover;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(300px, 420px);
+        gap: 28px;
+        padding: 34px;
+        align-items: end;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        border: 1px solid var(--line-strong);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.72);
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--accent);
+      }
+
+      h1 {
+        margin: 18px 0 14px;
+        font-size: clamp(40px, 7vw, 74px);
+        line-height: 0.96;
+        letter-spacing: -0.04em;
+      }
+
+      .lead {
+        max-width: 62ch;
+        margin: 0;
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.7;
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 24px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+        padding: 0 16px;
+        border: 1px solid var(--line-strong);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.85);
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .hero-card {
+        position: relative;
+        padding: 22px;
+        border: 1px solid rgba(88, 101, 58, 0.18);
+        border-radius: 26px;
+        background: linear-gradient(180deg, rgba(88, 101, 58, 0.07), rgba(255, 255, 255, 0.78));
+      }
+
+      .hero-card h2 {
+        margin: 0 0 16px;
+        font-size: 16px;
+        letter-spacing: 0.02em;
+      }
+
+      .hero-card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.65;
+      }
+
+      .mini-list {
+        display: grid;
+        gap: 12px;
+        margin-top: 18px;
+      }
+
+      .mini-item {
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: rgba(255, 253, 249, 0.95);
+      }
+
+      .mini-item strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 14px;
+      }
+
+      .mini-item span {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .section {
+        margin-top: 24px;
+        padding: 28px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-xl);
+        background: var(--panel);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(10px);
+      }
+
+      .section-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: end;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 22px;
+      }
+
+      .section-kicker {
+        margin: 0 0 8px;
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .section h2 {
+        margin: 0;
+        font-size: clamp(28px, 4vw, 42px);
+        line-height: 1;
+        letter-spacing: -0.03em;
+      }
+
+      .section-intro {
+        max-width: 58ch;
+        margin: 0;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.7;
+      }
+
+      .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .metric {
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background: var(--panel-strong);
+      }
+
+      .metric .value {
+        display: block;
+        margin-bottom: 10px;
+        font-size: clamp(32px, 5vw, 48px);
+        line-height: 0.95;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+      }
+
+      .metric strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 15px;
+      }
+
+      .metric span {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .concept-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .concept {
+        min-height: 210px;
+        padding: 22px;
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 241, 231, 0.95));
+      }
+
+      .concept-tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent-deep);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .concept h3 {
+        margin: 16px 0 10px;
+        font-size: 24px;
+      }
+
+      .concept p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.7;
+      }
+
+      .workflow {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .step {
+        position: relative;
+        padding: 22px;
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: var(--panel-strong);
+      }
+
+      .step-number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        background: var(--text);
+        color: #fff;
+        font-size: 18px;
+        font-weight: 800;
+      }
+
+      .step h3 {
+        margin: 16px 0 10px;
+        font-size: 22px;
+      }
+
+      .step p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.65;
+      }
+
+      .stack-grid {
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: 18px;
+      }
+
+      .stack-card,
+      .repo-card,
+      .command-card,
+      .summary-card {
+        padding: 22px;
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: var(--panel-strong);
+      }
+
+      .stack-card h3,
+      .repo-card h3,
+      .command-card h3,
+      .summary-card h3 {
+        margin: 0 0 14px;
+        font-size: 22px;
+      }
+
+      .stack-list,
+      .repo-list,
+      .command-list,
+      .summary-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .stack-item,
+      .repo-item,
+      .command-item,
+      .summary-item {
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: rgba(248, 244, 237, 0.78);
+      }
+
+      .stack-item strong,
+      .repo-item strong,
+      .command-item strong,
+      .summary-item strong {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 15px;
+      }
+
+      .stack-item span,
+      .repo-item span,
+      .command-item span,
+      .summary-item span {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.65;
+      }
+
+      code {
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: #f0e8dd;
+        font-family:
+          "SFMono-Regular",
+          ui-monospace,
+          "Cascadia Code",
+          "Source Code Pro",
+          monospace;
+        font-size: 13px;
+      }
+
+      .repo-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+
+      .board-shot {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: #f6f1e7;
+      }
+
+      .board-shot img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .footer-note {
+        margin-top: 20px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.7;
+      }
+
+      @media (max-width: 1080px) {
+        .hero-grid,
+        .stack-grid,
+        .repo-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .metric-grid,
+        .workflow {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .concept-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 720px) {
+        .page {
+          width: min(100% - 18px, 1180px);
+          padding-top: 10px;
+        }
+
+        .hero-grid,
+        .section {
+          padding: 20px;
+        }
+
+        .metric-grid,
+        .concept-grid,
+        .workflow {
+          grid-template-columns: 1fr;
+        }
+
+        h1 {
+          font-size: 42px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero">
+        <img class="hero-banner" src="assets/banner.jpg" alt="Multica 品牌横幅" />
+        <div class="hero-grid">
+          <div>
+            <div class="eyebrow">Multica 仓库可视化总览</div>
+            <h1>把编码 Agent 变成真正的团队成员</h1>
+            <p class="lead">
+              这份页面基于仓库中的 README、产品全景文档和 monorepo
+              结构整理，目的不是复述所有细节，而是把项目最核心的产品定位、工作流、技术结构和代码组织方式压缩成一张能快速读懂的地图。
+            </p>
+            <div class="hero-actions">
+              <span class="chip">开源 Managed Agents 平台</span>
+              <span class="chip">人类与 AI 共用同一工作流</span>
+              <span class="chip">厂商中立，支持本地与云端运行时</span>
+            </div>
+          </div>
+          <aside class="hero-card">
+            <h2>一句话判断项目本质</h2>
+            <p>
+              Multica 不是单点的 AI 工具，而是一个让 issue、agent、runtime、skill
+              和协作流程联动起来的任务操作系统。
+            </p>
+            <div class="mini-list">
+              <div class="mini-item">
+                <strong>工作入口是 Issue</strong>
+                <span>任务分配、评论讨论、状态推进、通知订阅都围绕 issue 展开。</span>
+              </div>
+              <div class="mini-item">
+                <strong>执行主体是 Agent</strong>
+                <span>Agent 像人一样拥有身份、配置、技能、对话历史和运行状态。</span>
+              </div>
+              <div class="mini-item">
+                <strong>执行环境是 Runtime</strong>
+                <span>本地 daemon 或云端实例负责发现可用 CLI 并实际跑任务。</span>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </header>
+
+      <section class="section">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">Fast Facts</p>
+            <h2>项目核心指标</h2>
+          </div>
+          <p class="section-intro">
+            从仓库与文档里可以快速提炼出几个最能定义 Multica 轮廓的数字。
+          </p>
+        </div>
+        <div class="metric-grid">
+          <div class="metric">
+            <span class="value">11</span>
+            <strong>支持的 Agent CLI</strong>
+            <span>Claude Code、Codex、Copilot CLI、Gemini、Kimi、Kiro CLI 等统一接入。</span>
+          </div>
+          <div class="metric">
+            <span class="value">3</span>
+            <strong>应用入口</strong>
+            <span><code>apps/web</code>、<code>apps/desktop</code>、<code>apps/docs</code> 三个应用面。</span>
+          </div>
+          <div class="metric">
+            <span class="value">5+</span>
+            <strong>共享包与视图库</strong>
+            <span><code>packages/core</code>、<code>ui</code>、<code>views</code> 等承载复用层。</span>
+          </div>
+          <div class="metric">
+            <span class="value">1</span>
+            <strong>统一后端执行面</strong>
+            <span>Go 服务端、PostgreSQL 与本地 daemon 组成完整的任务执行闭环。</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">Product Map</p>
+            <h2>六个必须先理解的核心对象</h2>
+          </div>
+          <p class="section-intro">
+            只要理解这六个对象之间的关系，就能读懂大多数功能设计和代码组织。
+          </p>
+        </div>
+        <div class="concept-grid">
+          <article class="concept">
+            <span class="concept-tag">Container</span>
+            <h3>Workspace</h3>
+            <p>所有资源的租户边界。Issue、Agent、Skill、Project、成员、通知全部隔离在 workspace 内。</p>
+          </article>
+          <article class="concept">
+            <span class="concept-tag">Work Unit</span>
+            <h3>Issue</h3>
+            <p>最核心的工作单元。它既是任务看板项，也是讨论线程、状态机、订阅中心和协作上下文。</p>
+          </article>
+          <article class="concept">
+            <span class="concept-tag">Worker</span>
+            <h3>Agent</h3>
+            <p>带身份的 AI 工作者。可被指派、可发表评论、可创建 issue，也能绑定技能、环境变量和 MCP 工具。</p>
+          </article>
+          <article class="concept">
+            <span class="concept-tag">Compute</span>
+            <h3>Runtime</h3>
+            <p>真正执行任务的机器环境。由 daemon 上报能力，告诉平台这台机器能跑哪些 agent CLI。</p>
+          </article>
+          <article class="concept">
+            <span class="concept-tag">Memory</span>
+            <h3>Skill</h3>
+            <p>工作区级复用知识。过去解决过的问题会沉淀成可挂载的说明文档，成为 agent 的长期能力。</p>
+          </article>
+          <article class="concept">
+            <span class="concept-tag">Automation</span>
+            <h3>Autopilot</h3>
+            <p>按 cron 或 webhook 自动创建 issue 并分配给 agent，让固定流程不再依赖人手触发。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">Flow</p>
+            <h2>产品最短工作流</h2>
+          </div>
+          <p class="section-intro">
+            README 里的快速上手可以压缩成下面四步，这也是用户第一次感知产品价值的最短路径。
+          </p>
+        </div>
+        <div class="workflow">
+          <article class="step">
+            <div class="step-number">1</div>
+            <h3>连接 Runtime</h3>
+            <p>运行 <code>multica setup</code>，本地 daemon 启动并向平台注册一台可执行任务的机器。</p>
+          </article>
+          <article class="step">
+            <div class="step-number">2</div>
+            <h3>创建 Agent</h3>
+            <p>为 agent 选择 provider、runtime、指令、环境变量和技能，形成一个可持续复用的 AI 身份。</p>
+          </article>
+          <article class="step">
+            <div class="step-number">3</div>
+            <h3>指派 Issue</h3>
+            <p>像指派给同事一样把 issue 指给 agent，它会自动认领任务、开始执行并更新状态。</p>
+          </article>
+          <article class="step">
+            <div class="step-number">4</div>
+            <h3>在同一线程协作</h3>
+            <p>进度、阻塞、结果都回到 issue 评论中；继续 @agent 会触发下一轮任务，形成可追溯闭环。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">Architecture</p>
+            <h2>系统架构与责任分层</h2>
+          </div>
+          <p class="section-intro">
+            Multica 的架构重点不在“模型能力”本身，而在任务编排、执行可见性与多主体协作的一致性。
+          </p>
+        </div>
+        <div class="stack-grid">
+          <div class="stack-card">
+            <h3>产品与数据平面</h3>
+            <div class="stack-list">
+              <div class="stack-item">
+                <strong>前端界面：Next.js + 桌面壳</strong>
+                <span>Web 端与 Electron 桌面端共享大部分产品体验，桌面端补充多标签与原生能力。</span>
+              </div>
+              <div class="stack-item">
+                <strong>服务端：Go + WebSocket</strong>
+                <span>负责 issue、comment、project、agent、runtime、notification 等核心领域与实时事件流。</span>
+              </div>
+              <div class="stack-item">
+                <strong>数据库：PostgreSQL + pgvector</strong>
+                <span>保存多态 actor 模型、任务历史、聊天记录、技能文件与订阅关系。</span>
+              </div>
+            </div>
+          </div>
+          <div class="stack-card">
+            <h3>执行与扩展平面</h3>
+            <div class="stack-list">
+              <div class="stack-item">
+                <strong>Daemon</strong>
+                <span>驻留在用户机器上，自动发现 <code>codex</code>、<code>claude</code>、<code>gemini</code> 等 CLI。</span>
+              </div>
+              <div class="stack-item">
+                <strong>Skills</strong>
+                <span>作为附加上下文注入 agent 工作目录，帮助任务跨 issue 复用经验和流程。</span>
+              </div>
+              <div class="stack-item">
+                <strong>MCP Servers</strong>
+                <span>按 agent 粒度接入外部工具，让执行环境从“能写代码”扩展到“能调系统”。</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="footer-note">
+          README 中给出的主架构为：Next.js 前端 + Go Backend + PostgreSQL +
+          Agent Daemon。产品全景文档进一步说明，绝大多数行为都围绕“多态行动者”
+          设计，即成员和 agent 共享同一套行为模型。
+        </p>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">Repo Map</p>
+            <h2>Monorepo 结构怎么读</h2>
+          </div>
+          <p class="section-intro">
+            如果目标是快速上手代码，不需要一开始就通读所有目录。先记住下面这几个高价值入口。
+          </p>
+        </div>
+        <div class="repo-layout">
+          <div class="repo-card">
+            <h3>应用层目录</h3>
+            <div class="repo-list">
+              <div class="repo-item">
+                <strong><code>apps/web</code></strong>
+                <span>主产品 Web 端，承载 issue board、settings、chat、workspace 等核心界面。</span>
+              </div>
+              <div class="repo-item">
+                <strong><code>apps/desktop</code></strong>
+                <span>Electron 桌面端，为同一产品模型提供本地壳、窗口与桌面体验。</span>
+              </div>
+              <div class="repo-item">
+                <strong><code>apps/docs</code></strong>
+                <span>文档站点，用于对外说明安装、CLI、自托管与产品能力。</span>
+              </div>
+            </div>
+          </div>
+          <div class="repo-card">
+            <h3>共享与后端目录</h3>
+            <div class="repo-list">
+              <div class="repo-item">
+                <strong><code>packages/views</code> / <code>packages/ui</code></strong>
+                <span>共享视图与 UI 层，承接跨应用的页面片段和组件系统。</span>
+              </div>
+              <div class="repo-item">
+                <strong><code>packages/core</code></strong>
+                <span>通用逻辑、类型或领域级工具，作为应用和视图层的基础依赖。</span>
+              </div>
+              <div class="repo-item">
+                <strong><code>server</code></strong>
+                <span>Go 后端、sqlc 查询、迁移、命令行与 agent 执行适配器的集中所在。</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">Visual Anchor</p>
+            <h2>产品界面的核心感知</h2>
+          </div>
+          <p class="section-intro">
+            仓库里的产品截图很关键，因为它直接说明 Multica 把 agent
+            放在了看板、状态、评论与协作界面的中心位置。
+          </p>
+        </div>
+        <div class="repo-layout">
+          <div class="board-shot">
+            <img src="assets/hero-screenshot.png" alt="Multica 看板界面截图" />
+          </div>
+          <div class="summary-card">
+            <h3>从这张界面图里能读出的设计判断</h3>
+            <div class="summary-list">
+              <div class="summary-item">
+                <strong>Agent 不是隐藏在弹窗后的执行器</strong>
+                <span>它被放进和人类成员同等级的任务分配与评论体系里。</span>
+              </div>
+              <div class="summary-item">
+                <strong>协作入口是项目管理，而不是聊天窗口</strong>
+                <span>用户首先看到的是 board、issue、timeline，而不是单轮 prompt 输入框。</span>
+              </div>
+              <div class="summary-item">
+                <strong>平台价值在于编排与持续性</strong>
+                <span>同一 agent 在同一 issue 中可恢复会话、保留工作目录，并持续积累技能。</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">Ops</p>
+            <h2>最值得记住的命令与入口</h2>
+          </div>
+          <p class="section-intro">
+            对新人来说，理解这几个入口比记住所有文档细节更重要。
+          </p>
+        </div>
+        <div class="repo-layout">
+          <div class="command-card">
+            <h3>用户侧命令</h3>
+            <div class="command-list">
+              <div class="command-item">
+                <strong><code>multica setup</code></strong>
+                <span>配置、认证并启动 daemon，是连接本地 runtime 的最短路径。</span>
+              </div>
+              <div class="command-item">
+                <strong><code>multica daemon status</code></strong>
+                <span>确认 daemon 是否在线，以及当前机器是否正常作为 runtime 汇报。</span>
+              </div>
+              <div class="command-item">
+                <strong><code>multica issue create</code></strong>
+                <span>创建任务，随后即可在 UI 或 CLI 中分配给 agent。</span>
+              </div>
+            </div>
+          </div>
+          <div class="command-card">
+            <h3>开发侧入口</h3>
+            <div class="command-list">
+              <div class="command-item">
+                <strong><code>make dev</code></strong>
+                <span>仓库推荐的一键开发启动命令：建环境、装依赖、配数据库、跑迁移并起服务。</span>
+              </div>
+              <div class="command-item">
+                <strong><code>pnpm test</code> / <code>pnpm lint</code></strong>
+                <span>monorepo 顶层统一测试与静态检查入口，内部通过 Turbo 编排执行。</span>
+              </div>
+              <div class="command-item">
+                <strong><code>server/cmd/multica</code></strong>
+                <span>CLI 的 Go 实现入口，和 runtime / issue / project 等命令编排直接相关。</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">Bottom Line</p>
+            <h2>最终结论</h2>
+          </div>
+          <p class="section-intro">
+            如果只保留一句总结，应该是下面这句。
+          </p>
+        </div>
+        <div class="summary-card">
+          <h3>Multica 的竞争点不只是“能调几个模型”</h3>
+          <div class="summary-list">
+            <div class="summary-item">
+              <strong>它把 Agent 放进了真实团队流程</strong>
+              <span>任务创建、分配、执行、通知、历史追踪、自动化和技能复用都统一在一个工作系统里。</span>
+            </div>
+            <div class="summary-item">
+              <strong>它把执行能力和产品体验分离</strong>
+              <span>底层 CLI 可以替换，甚至运行时也可替换，但上层协作模型保持稳定。</span>
+            </div>
+            <div class="summary-item">
+              <strong>它是一个“多主体任务操作系统”</strong>
+              <span>真正的产品价值在于把人、agent、runtime、skill、project 和 issue 组织成一套长期运行机制。</span>
+            </div>
+          </div>
+        </div>
+        <p class="footer-note">
+          文件输出路径：<code>docs/project-core-overview.html</code>。内容依据仓库内现有文档整理，适合作为 onboarding
+          或产品介绍的快速入口。
+        </p>
+      </section>
+    </div>
+  </body>
+</html>

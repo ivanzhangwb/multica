@@ -1,4 +1,9 @@
 {
   "title": "Developers",
-  "pages": ["contributing", "architecture", "conventions"]
+  "pages": [
+    "contributing",
+    "architecture",
+    "agent-runtime-execution",
+    "conventions"
+  ]
 }
