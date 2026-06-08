@@ -1,0 +1,26 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: multica-server-java
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/multica}
+    username: ${POSTGRES_USER:multica}
+    password: ${POSTGRES_PASSWORD:multica}
+    driver-class-name: org.postgresql.Driver
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+multica:
+  migrations:
+    enabled: ${MULTICA_JAVA_RUN_MIGRATIONS:false}
+    directory: ${MULTICA_MIGRATIONS_DIR:../server/migrations}
